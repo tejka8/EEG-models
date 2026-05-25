@@ -744,7 +744,7 @@ class EEGDatasetBuilder(datasets.GeneratorBasedBuilder, ABC):
             n_proc=n_proc,
             desc='Checking montage channel'
         )
-        sel = np.array(results, dtype=np.bool)
+        sel = np.array(results, dtype=np.bool_)
 
         wrong_files = df.loc[~sel, 'path'].tolist()
         with open(self.log_err_files_path, 'a') as f:
