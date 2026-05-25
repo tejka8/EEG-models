@@ -26,7 +26,7 @@ model:
   # GPT (decoder) параметри
   num_hidden_layers: 6
   embedding_dim: 1024          # embed_dim на GPT
-  num_attention_heads: 12
+  num_attention_heads: 8
   n_positions: 512
   dropout: 0.1
   

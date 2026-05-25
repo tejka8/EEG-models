@@ -1423,20 +1423,81 @@ class AbstractTrainer(ABC):
         logger.info(f"Training setup complete. Starting {self.cfg.training.max_epochs} epochs...")
 
         # Training loop
+        # for epoch in range(self.cfg.training.max_epochs):
+        #     self.epoch = epoch
+
+        #     if torch.distributed.is_available() and torch.distributed.is_initialized():
+        #         torch.distributed.barrier()
+
+        #     self.train_epoch(train_loader, train_sampler)
+
+        #     self.eval_epoch(valid_loaders, 'eval')
+        #     self.eval_epoch(test_loaders, 'test')
+
+        #     # Save checkpoint
+        #     if (epoch + 1) % self.cfg.logging.ckpt_interval == 0:
+        #         self.save_checkpoint()
+        # Training loop
+        best_auroc = 0.0
+        patience_counter = 0
+        early_stopping_patience = getattr(self.cfg.training, 'early_stopping_patience', 10)
+        
         for epoch in range(self.cfg.training.max_epochs):
             self.epoch = epoch
-
+        
             if torch.distributed.is_available() and torch.distributed.is_initialized():
                 torch.distributed.barrier()
-
+        
             self.train_epoch(train_loader, train_sampler)
-
-            self.eval_epoch(valid_loaders, 'eval')
+        
+            eval_metrics = self.eval_epoch(valid_loaders, 'eval')
             self.eval_epoch(test_loaders, 'test')
-
-            # Save checkpoint
+        
+            # Get average validation AUROC across all datasets
+            current_auroc = 0.0
+            if get_is_master():
+                auroc_values = []
+                for ds_key in self.ds_info.keys():
+                    if ds_key in eval_metrics and eval_metrics[ds_key]['logits']:
+                        labels_all = torch.concat(eval_metrics[ds_key]['labels'], dim=0)
+                        logits_all = torch.concat(eval_metrics[ds_key]['logits'], dim=0)
+                        probs = torch.softmax(logits_all.float(), dim=1)[:, 1].numpy()
+                        labels_np = labels_all.numpy()
+                        try:
+                            auroc_values.append(roc_auc_score(labels_np, probs))
+                        except Exception:
+                            pass
+                if auroc_values:
+                    current_auroc = sum(auroc_values) / len(auroc_values)
+        
+            # Early stopping
+            if get_is_master():
+                if current_auroc > best_auroc:
+                    best_auroc = current_auroc
+                    patience_counter = 0
+                    logger.info(f"New best val AUROC: {best_auroc:.4f} at epoch {epoch}")
+                    self.save_checkpoint()
+                else:
+                    patience_counter += 1
+                    logger.info(f"No improvement. Patience: {patience_counter}/{early_stopping_patience}")
+        
+            # Broadcast early stopping decision
+            should_stop = torch.tensor(
+                1 if (get_is_master() and patience_counter >= early_stopping_patience) else 0,
+                device=self.device
+            )
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.broadcast(should_stop, src=0)
+        
+            if should_stop.item() == 1:
+                logger.info(f"Early stopping at epoch {epoch}!")
+                break
+        
+            # Save checkpoint at intervals
             if (epoch + 1) % self.cfg.logging.ckpt_interval == 0:
                 self.save_checkpoint()
+
+
 
         self.save_checkpoint(is_milestone=True)
 
