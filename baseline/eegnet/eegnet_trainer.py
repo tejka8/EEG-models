@@ -50,7 +50,7 @@ class EegNetTrainer(ClassicalTrainer):
 
         (ds_name, info) = next(iter(self.ds_info.items()))
 
-        self.encoder = braindecode.models.EEGNetv1(
+        self.encoder = braindecode.models.EEGNetv4(
             n_outputs=info['n_class'],
             n_chans=info['n_ch'],
             n_times=info['wnd_sec'] * self.sfreq,
