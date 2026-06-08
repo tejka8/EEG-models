@@ -162,14 +162,6 @@ python baseline_main.py conf_file=baseline/neurogpt/neurogpt_crown.yaml model_ty
 python crown_dataset_builder.py
 ```
 
-### Running Inference via Dashboard
-
-```bash
-cd dashboard
-uvicorn backend.main:app --reload --port 8000
-# Open http://localhost:8000 and upload a CSV
-```
-
 ---
 
 ## Tech Stack
@@ -186,16 +178,6 @@ uvicorn backend.main:app --reload --port 8000
 
 ---
 
-## Reproducibility
-
-- All experiments use a fixed random seed (`42`) for the train/validation/test split
-- Identical preprocessing for all models (highpass → notch → resample → window)
-- Same evaluation metrics (AUROC, AUC-PR, accuracy, balanced accuracy)
-- Per-epoch checkpoints saved during training
-- Training logs and per-epoch metrics available on Weights & Biases
-
----
-
 ## Limitations
 
 This is a research prototype, not a diagnostic tool. Important caveats:
@@ -207,38 +189,4 @@ This is a research prototype, not a diagnostic tool. Important caveats:
 
 ---
 
-## Citation
 
-If you use this work, please cite:
-
-```bibtex
-@thesis{ristevska2026eegfmbench,
-  title  = {Сyстем за компаративна евалуација на EEG модели за ADHD класификација},
-  author = {Ристевска, Јована},
-  school = {Faculty of Computer Science and Engineering, Ss. Cyril and Methodius University in Skopje},
-  year   = {2026},
-  type   = {Diploma thesis}
-}
-```
-
----
-
-## License
-
-This project is released under the MIT License.
-
-EEG data used in this project comes from a publicly available ADHD dataset. Please refer to the original dataset's license for usage terms.
-
----
-
-## Author
-
-**Јована Ристевска** (Jovana Ristevska)
-Faculty of Computer Science and Engineering, Skopje
-2026
-
-## Acknowledgments
-
-- The original ADHD EEG dataset providers
-- The authors of NeuroGPT, EEGPT, and EEGNet for their open-source models
-- braindecode and MNE-Python communities for their excellent EEG tooling
