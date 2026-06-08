@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EEG Analysis Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #4f46e5; --primary-dark: #4338ca; --primary-light: #e0e7ff;
+      --success: #059669; --success-light: #d1fae5;
+      --warning: #d97706; --warning-light: #fef3c7;
+      --danger: #dc2626; --danger-light: #fee2e2;
+      --text: #0f172a; --text-muted: #64748b; --text-light: #94a3b8;
+      --border: #e2e8f0; --border-light: #f1f5f9;
+      --bg: #f8fafc; --card-bg: #ffffff;
+      --sidebar-bg: #0f172a; --sidebar-hover: #1e293b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; font-size: 14px; line-height: 1.5; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+    select, input { font-family: inherit; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .sidebar { width: 220px; min-width: 220px; background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-logo .logo-row { display: flex; align-items: center; gap: 10px; }
+    .sidebar-logo .logo-icon { width: 32px; height: 32px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .sidebar-logo .logo-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+    .sidebar-logo .logo-sub { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px; line-height: 1.4; }
+    .nav { flex: 1; padding: 12px 0; }
+    .nav-section-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 20px 6px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 20px; font-size: 13.5px; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+    .nav-item:hover { background: var(--sidebar-hover); color: #fff; }
+    .nav-item.active { background: rgba(99,102,241,0.15); color: #fff; border-left-color: var(--primary); font-weight: 600; }
+    .nav-item .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+    .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: rgba(255,255,255,0.45); line-height: 1.5; }
+    .status-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-light); }
+    .status-dot.ok { background: var(--success); }
+    .status-dot.err { background: var(--danger); }
+
+    .main { margin-left: 220px; flex: 1; padding: 32px 40px 40px; min-height: 100vh; max-width: 1500px; }
+    .page { display: none; }
+    .page.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+    .page-header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+    .card-section-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+
+    .btn { padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: #fff; border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { background: var(--bg); }
+    .btn-danger-text { color: var(--danger); background: transparent; padding: 6px 10px; font-size: 13px; }
+    .btn-danger-text:hover { background: var(--danger-light); }
+    .btn-lg { padding: 14px 24px; font-size: 15px; }
+
+    .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .badge-success { background: var(--success-light); color: #065f46; }
+    .badge-warning { background: var(--warning-light); color: #92400e; }
+    .badge-danger  { background: var(--danger-light);  color: #991b1b; }
+    .badge-info    { background: var(--primary-light); color: var(--primary-dark); }
+    .badge-muted   { background: #f1f5f9; color: var(--text-muted); }
+
+    .upload-hero { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 40px; text-align: center; }
+    .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 48px 24px; cursor: pointer; transition: all 0.2s; background: var(--bg); }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary); background: var(--primary-light); }
+    .upload-zone.file-selected { border-color: var(--success); background: var(--success-light); border-style: solid; }
+    .upload-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.7; }
+    .upload-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .upload-sub { font-size: 13px; color: var(--text-muted); }
+    .file-name { font-size: 13px; color: var(--success); font-weight: 600; margin-top: 12px; }
+
+    .patient-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; text-align: left; }
+    .input-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    .input-group input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text); transition: border-color 0.15s; }
+    .input-group input:focus { outline: none; border-color: var(--primary); }
+
+    .model-info-line { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+    .progress-card { margin-top: 24px; }
+    .progress-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .progress-bg { background: var(--border-light); border-radius: 999px; height: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #8b5cf6); border-radius: 999px; transition: width 0.4s ease; }
+    .progress-step { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+
+    .ensemble-banner { background: #fff; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+    .status-bar { height: 4px; }
+    .status-bar.adhd { background: var(--warning); }
+    .status-bar.control { background: var(--success); }
+    .ensemble-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .ensemble-left, .ensemble-right { padding: 28px; }
+    .ensemble-right { border-left: 1px solid var(--border-light); }
+
+    .result-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+    .result-icon { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+    .result-icon.adhd { background: var(--warning-light); color: var(--warning); }
+    .result-icon.control { background: var(--success-light); color: var(--success); }
+    .result-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; }
+    .result-title { font-size: 20px; font-weight: 700; color: var(--text); margin-top: 2px; }
+
+    .summary-dl { font-size: 13.5px; }
+    .summary-dl div { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-light); }
+    .summary-dl div:last-child { border-bottom: none; }
+    .summary-dl dt { color: var(--text-muted); }
+    .summary-dl dd { font-weight: 600; color: var(--text); }
+
+    .confidence-section { text-align: center; margin-bottom: 20px; }
+    .confidence-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
+    .confidence-value { font-size: 48px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; line-height: 1; }
+    .confidence-rel { margin-top: 10px; }
+    .agreement-text { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+    .agreement-text strong { color: var(--text); }
+
+    .prob-row { margin-bottom: 12px; }
+    .prob-header { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
+    .prob-label { color: var(--text-muted); font-weight: 500; }
+    .prob-value { color: var(--text); font-weight: 700; }
+    .prob-bg { background: var(--border-light); border-radius: 999px; height: 8px; overflow: hidden; }
+    .prob-fill { height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+    .prob-fill.adhd { background: var(--warning); }
+    .prob-fill.control { background: var(--success); }
+
+    .disclaimer { background: var(--bg); border-top: 1px solid var(--border-light); padding: 12px 28px; font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+    .action-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+
+    .per-model-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .per-model-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 8px; }
+    .model-tile { border: 1px solid var(--border); border-radius: 10px; padding: 18px; background: #fff; position: relative; transition: all 0.2s; }
+    .model-tile.winner-adhd { border-color: var(--warning); background: linear-gradient(180deg, #fffbeb 0%, #ffffff 60%); }
+    .model-tile.winner-control { border-color: var(--success); background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 60%); }
+    .model-tile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .model-tile-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .model-tile-arch { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .model-tile-prediction { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-light); }
+    .prediction-pill { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .prediction-pill.adhd { background: var(--warning-light); color: #92400e; }
+    .prediction-pill.control { background: var(--success-light); color: #065f46; }
+    .model-tile-metric-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12.5px; }
+    .model-tile-metric-row .lbl { color: var(--text-muted); }
+    .model-tile-metric-row .val { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .model-confidence-bar { margin-top: 10px; }
+    .model-confidence-bar .bg { background: var(--border-light); border-radius: 999px; height: 6px; overflow: hidden; }
+    .model-confidence-bar .fill { height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+    .model-tile-meta { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+    .signal-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .chart-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+    .chart-controls label { font-size: 12px; color: var(--text-muted); }
+    .chart-controls select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: #fff; }
+    .chart-wrapper { position: relative; height: 220px; }
+
+    .band-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+    .band-row:last-child { border-bottom: none; }
+    .band-icon { font-size: 18px; width: 22px; text-align: center; }
+    .band-info { flex: 1; }
+    .band-name { font-weight: 600; font-size: 13px; color: var(--text); }
+    .band-freq { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+    .explain-section { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .explain-model-selector { display: flex; gap: 6px; margin-bottom: 14px; }
+    .explain-tab { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.15s; background: #fff; }
+    .explain-tab:hover { background: var(--bg); }
+    .explain-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .window-timeline { display: flex; gap: 2px; margin: 12px 0; flex-wrap: wrap; }
+    .window-block { width: 22px; height: 30px; border-radius: 4px; position: relative; cursor: help; }
+    .window-block.adhd { background: var(--warning); opacity: 0.85; }
+    .window-block.control { background: var(--success); opacity: 0.85; }
+    .window-legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+    .legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; margin-right: 5px; }
+
+    .models-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+    .model-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: all 0.2s; }
+    .model-card:hover { border-color: #c7d2fe; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(15,23,42,0.06); }
+    .model-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .model-name { font-size: 18px; font-weight: 700; color: var(--text); }
+    .model-arch { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+    .model-hero-metric { background: var(--bg); border-radius: 10px; padding: 18px; margin-bottom: 16px; text-align: center; }
+    .hero-value { font-size: 36px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; line-height: 1; }
+    .hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; margin-top: 6px; }
+    .mini-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .mini-metric { text-align: center; padding: 10px 8px; background: var(--bg); border-radius: 8px; }
+    .mini-value { font-size: 16px; font-weight: 700; color: var(--text); }
+    .mini-label { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .tag { padding: 3px 9px; background: var(--border-light); color: var(--text-muted); border-radius: 6px; font-size: 11.5px; font-weight: 500; }
+    .tag.highlight { background: var(--primary-light); color: var(--primary-dark); }
+    .model-card-footer { padding-top: 16px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; }
+    .checkpoint-name { font-size: 11px; color: var(--text-muted); font-family: 'Courier New', monospace; }
+    .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border-light); }
+    .compare-table th { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; background: var(--bg); }
+    .compare-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .compare-table tr.winner td { background: #f0fdf4; font-weight: 600; }
+    .compare-table tr.winner td:first-child::before { content: "🏆 "; }
+    .arch-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; font-size: 13px; }
+    .arch-detail dt { color: var(--text-muted); }
+    .arch-detail dd { font-weight: 600; color: var(--text); font-family: 'Courier New', monospace; font-size: 12.5px; }
+
+    .history-toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .search-box { flex: 1; max-width: 320px; position: relative; }
+    .search-box input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px; background: #fff; }
+    .search-box input:focus { outline: none; border-color: var(--primary); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+    .filter-select { padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px; background: #fff; color: var(--text); }
+    .history-table { width: 100%; border-collapse: collapse; background: #fff; }
+    .history-table th, .history-table td { padding: 14px 18px; text-align: left; border-bottom: 1px solid var(--border-light); font-size: 13.5px; }
+    .history-table th { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; background: var(--bg); }
+    .history-table tr:hover td { background: #fafbfc; }
+    .history-table td.actions { text-align: right; }
+    .icon-btn { width: 30px; height: 30px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .icon-btn:hover { background: var(--bg); color: var(--text); }
+    .icon-btn.danger:hover { background: var(--danger-light); color: var(--danger); }
+    .empty-state { text-align: center; padding: 60px 24px; color: var(--text-muted); }
+    .empty-icon { font-size: 48px; opacity: 0.3; margin-bottom: 12px; }
+    .empty-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .empty-sub { font-size: 13px; }
+    .history-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .stat-card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+    .stat-value { font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+    .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-top: 4px; }
+
+    .about-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .about-section { margin-bottom: 20px; }
+    .about-section h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+    .about-section p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; margin-bottom: 10px; }
+    .about-section ul { list-style: none; padding: 0; }
+    .about-section ul li { padding: 6px 0; font-size: 13.5px; color: var(--text); display: flex; gap: 8px; }
+    .about-section ul li::before { content: "✓"; color: var(--success); font-weight: 700; }
+    .callout { border-left: 4px solid var(--warning); background: var(--warning-light); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; }
+    .callout-title { font-weight: 700; color: #78350f; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .callout-list { list-style: none; padding: 0; }
+    .callout-list li { font-size: 12.5px; color: #78350f; padding: 3px 0; padding-left: 16px; position: relative; }
+    .callout-list li::before { content: "•"; position: absolute; left: 0; font-weight: 700; }
+    .info-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+
+    .error-card { background: var(--danger-light); border: 1px solid #fecaca; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 10px; }
+    .error-card .error-msg { font-size: 13.5px; color: #991b1b; flex: 1; }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13.5px; z-index: 1000; animation: slideUp 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    @media print {
+      .sidebar, .no-print { display: none !important; }
+      .main { margin-left: 0; padding: 0; }
+      .ensemble-banner { border: 2px solid var(--text); }
+    }
+    @media (max-width: 1100px) {
+      .ensemble-grid { grid-template-columns: 1fr; }
+      .ensemble-right { border-left: none; border-top: 1px solid var(--border-light); }
+      .signal-row { grid-template-columns: 1fr; }
+      .about-grid { grid-template-columns: 1fr; }
+      .per-model-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-220px); }
+      .main { margin-left: 0; padding: 16px; }
+      .history-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-row">
+      <div class="logo-icon">🧠</div>
+      <div><div class="logo-title">EEG Analysis</div></div>
+    </div>
+    <div class="logo-sub">AI-assisted ADHD detection</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section-label">Workspace</div>
+    <div class="nav-item active" data-page="analyze"><span class="nav-icon">▶</span> Analyze</div>
+    <div class="nav-item" data-page="history">
+      <span class="nav-icon">📁</span> History
+      <span class="badge badge-muted" id="history-count" style="margin-left:auto; font-size:10px;">0</span>
+    </div>
+    <div class="nav-section-label">Reference</div>
+    <div class="nav-item" data-page="models"><span class="nav-icon">🤖</span> Models</div>
+    <div class="nav-item" data-page="about"><span class="nav-icon">ℹ</span> About</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-row">
+      <span id="health-dot" class="status-dot"></span>
+      <span id="health-label">Connecting…</span>
+    </div>
+    <div>Research prototype<br>v1.0 · May 2026</div>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- ANALYZE PAGE -->
+  <div class="page active" id="page-analyze">
+    <div class="page-header">
+      <h1>Analyze EEG Recording</h1>
+      <p>Upload an EEG file. All 3 models will analyze it and provide an ensemble decision.</p>
+    </div>
+
+    <div id="error-card-analyze" class="error-card" style="display:none">
+      <span style="font-size:18px;">⚠️</span>
+      <span class="error-msg" id="error-msg-analyze"></span>
+      <button class="icon-btn" onclick="dismissError('analyze')">×</button>
+    </div>
+
+    <div id="upload-state">
+      <div class="upload-hero">
+        <div class="upload-zone" id="upload-zone"
+             onclick="document.getElementById('file-input').click()"
+             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <div class="upload-icon">⬆️</div>
+          <div class="upload-title">Drop EEG file here or click to browse</div>
+          <div class="upload-sub">.csv · 19-channel 10-20 montage · any sampling rate</div>
+          <div class="file-name" id="file-name" style="display:none"></div>
+        </div>
+        <input type="file" id="file-input" accept=".csv" style="display:none" onchange="onFileSelect(event)" />
+        <div class="patient-meta">
+          <div class="input-group"><label>Patient ID (optional)</label><input type="text" id="patient-id" placeholder="e.g., P-2026-001" /></div>
+          <div class="input-group"><label>Session date (optional)</label><input type="date" id="session-date" /></div>
+        </div>
+        <div style="margin-top:24px;">
+          <button class="btn btn-primary btn-lg" id="analyze-btn" onclick="analyzeEEG()" disabled>▶ Run Ensemble Analysis</button>
+        </div>
+        <div class="model-info-line">
+          🤖 Running 3 models in parallel: <strong>NeuroGPT</strong>, <strong>EEGPT</strong>, <strong>EEGNet</strong>
+        </div>
+      </div>
+
+      <div class="card progress-card" id="progress-card" style="display:none">
+        <div class="card-title">Analyzing</div>
+        <div class="progress-row">
+          <span style="color:var(--text-muted);">Processing EEG signal...</span>
+          <span id="progressPercent" style="color:var(--primary); font-weight:600;">0%</span>
+        </div>
+        <div class="progress-bg"><div class="progress-fill" id="progressBar" style="width:0%;"></div></div>
+        <div class="progress-step" id="progressStep">Step 1/5: Reading CSV file...</div>
+      </div>
+    </div>
+
+    <div id="results-state" style="display:none;">
+      <div class="action-row no-print">
+        <button class="btn btn-primary" onclick="saveToHistory()">💾 Save to History</button>
+        <button class="btn btn-secondary" onclick="exportResultPDF()">📄 Export PDF</button>
+        <button class="btn btn-secondary" onclick="newAnalysis()">+ New Analysis</button>
+      </div>
+
+      <div class="ensemble-banner">
+        <div class="status-bar" id="status-bar"></div>
+        <div class="ensemble-grid">
+          <div class="ensemble-left">
+            <div class="result-header">
+              <div class="result-icon" id="result-icon"></div>
+              <div>
+                <div class="result-label">Ensemble Decision (majority vote)</div>
+                <div class="result-title" id="result-title">—</div>
+              </div>
+            </div>
+            <dl class="summary-dl">
+              <div><dt>Patient ID</dt><dd id="sum-patient">—</dd></div>
+              <div><dt>Session date</dt><dd id="sum-date">—</dd></div>
+              <div><dt>Models used</dt><dd>3 (NeuroGPT, EEGPT, EEGNet)</dd></div>
+              <div><dt>Windows analyzed</dt><dd class="tabular" id="sum-windows">—</dd></div>
+              <div><dt>Recording length</dt><dd class="tabular" id="sum-duration">—</dd></div>
+            </dl>
+          </div>
+          <div class="ensemble-right">
+            <div class="confidence-section">
+              <div class="confidence-label">Ensemble confidence</div>
+              <div class="confidence-value tabular" id="conf-value">—</div>
+              <div class="confidence-rel"><span class="badge" id="reliability-badge">—</span></div>
+              <div class="agreement-text">Model agreement: <strong id="agreement-text">—</strong></div>
+            </div>
+            <div style="margin-top:24px;">
+              <div class="prob-row">
+                <div class="prob-header"><span class="prob-label">ADHD likelihood</span><span class="prob-value tabular" id="prob-adhd-pct">—</span></div>
+                <div class="prob-bg"><div class="prob-fill adhd" id="prob-adhd" style="width:0%"></div></div>
+              </div>
+              <div class="prob-row">
+                <div class="prob-header"><span class="prob-label">Control likelihood</span><span class="prob-value tabular" id="prob-control-pct">—</span></div>
+                <div class="prob-bg"><div class="prob-fill control" id="prob-control" style="width:0%"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="disclaimer">ℹ This is an AI-assisted analysis for research use only. Clinical diagnosis requires evaluation by a qualified specialist.</div>
+      </div>
+
+      <div class="per-model-card">
+        <div class="card-section-title">Per-Model Breakdown</div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:8px;">Individual predictions from each of the three models on the same recording.</p>
+        <div class="per-model-grid" id="per-model-grid"></div>
+      </div>
+
+      <div class="signal-row">
+        <div class="card">
+          <div class="card-section-title">EEG Signal</div>
+          <div class="chart-controls">
+            <label>Window:</label>
+            <select id="time-window" onchange="updateChartWindow()">
+              <option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option>
+            </select>
+          </div>
+          <div class="chart-wrapper"><canvas id="eeg-chart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-section-title">Brainwave Bands</div>
+          <div id="bands-container"></div>
+        </div>
+      </div>
+
+      <div class="explain-section" style="margin-top:20px;">
+        <div class="card-section-title">Per-Window Predictions</div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">The recording is split into 4-second windows. Switch between models to see how each one classified each window.</p>
+        <div class="explain-model-selector" id="explain-model-selector"></div>
+        <div class="window-timeline" id="window-timeline"></div>
+        <div class="window-legend">
+          <span><span class="legend-dot" style="background:var(--warning);"></span> ADHD pattern</span>
+          <span><span class="legend-dot" style="background:var(--success);"></span> Control pattern</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODELS PAGE -->
+  <div class="page" id="page-models">
+    <div class="page-header"><h1>Models</h1><p>Detailed information about the three benchmarked architectures.</p></div>
+    <div class="models-grid" id="models-grid"></div>
+    <div style="margin-top:32px;">
+      <div class="card">
+        <div class="card-section-title">Performance Comparison</div>
+        <table class="compare-table">
+          <thead>
+            <tr><th>Model</th><th class="num">Test AUROC</th><th class="num">Accuracy</th><th class="num">Balanced Acc</th><th class="num">AUC-PR</th><th class="num">Best Epoch</th></tr>
+          </thead>
+          <tbody id="compare-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:20px;">
+      <div class="card">
+        <div class="card-section-title">Architecture Details</div>
+        <div id="arch-details-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY PAGE -->
+  <div class="page" id="page-history">
+    <div class="page-header"><h1>Patient History</h1><p>Previously analyzed EEG recordings stored locally in your browser.</p></div>
+    <div class="history-stats" id="history-stats"></div>
+    <div class="history-toolbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="history-search" placeholder="Search by patient ID..." oninput="renderHistory()" />
+      </div>
+      <select class="filter-select" id="filter-prediction" onchange="renderHistory()">
+        <option value="">All predictions</option>
+        <option value="ADHD">ADHD only</option>
+        <option value="Control">Control only</option>
+      </select>
+      <button class="btn btn-secondary" onclick="exportHistoryCSV()" style="margin-left:auto;">📥 Export CSV</button>
+      <button class="btn-danger-text" onclick="clearAllHistory()">Clear all</button>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table class="history-table">
+        <thead>
+          <tr><th>Date</th><th>Patient ID</th><th>Ensemble Result</th><th>Confidence</th><th>Agreement</th><th>Windows</th><th></th></tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+      <div id="history-empty" style="display:none;">
+        <div class="empty-state">
+          <div class="empty-icon">📂</div>
+          <div class="empty-title">No analyses yet</div>
+          <div class="empty-sub">Run an analysis on the Analyze page to start building history.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABOUT PAGE -->
+  <div class="page" id="page-about">
+    <div class="page-header"><h1>About EEG Analysis Dashboard</h1><p>Research prototype for AI-assisted ADHD detection from EEG signals.</p></div>
+    <div class="callout">
+      <div class="callout-title">⚠ Important Limitations</div>
+      <ul class="callout-list">
+        <li>This is a research prototype, not a diagnostic tool.</li>
+        <li>Trained on 121 children aged 7–12 — performance outside this range is unverified.</li>
+        <li>Requires 19-channel 10-20 montage at 128 Hz or higher; other configurations are not supported.</li>
+        <li>Band power thresholds are indicative, not clinically validated.</li>
+        <li>Always consult a qualified clinician for ADHD diagnosis.</li>
+      </ul>
+    </div>
+    <div class="about-grid">
+      <div>
+        <div class="card">
+          <div class="about-section">
+            <h3>Project Overview</h3>
+            <p>EEG-FM-Bench is a benchmarking framework that compares modern foundation models for EEG against classical approaches in the task of ADHD classification. The system trains and evaluates three architectures on the same dataset under identical conditions, enabling fair comparison.</p>
+            <p>The dashboard runs all three models in parallel on every uploaded recording and combines their decisions via majority voting, increasing reliability compared to any single model.</p>
+          </div>
+          <div class="about-section">
+            <h3>Models</h3>
+            <ul>
+              <li><strong>NeuroGPT</strong> — Transformer foundation model with pretrained weights (best performer)</li>
+              <li><strong>EEGPT</strong> — Transformer foundation model trained from scratch</li>
+              <li><strong>EEGNet</strong> — Compact CNN baseline trained on raw EEG signals</li>
+            </ul>
+          </div>
+          <div class="about-section">
+            <h3>Ensemble Strategy</h3>
+            <p>The dashboard uses a simple majority vote across the three models. Final confidence is the average of the agreeing models' confidences. Reliability is High only when all three models agree with high individual confidence.</p>
+          </div>
+          <div class="about-section">
+            <h3>Preprocessing Pipeline</h3>
+            <ul>
+              <li>Notch filter at 50 Hz to remove power-line interference</li>
+              <li>Bandpass filter 0.1–60 Hz</li>
+              <li>Resampling to 256 Hz</li>
+              <li>Non-overlapping windows of 4 seconds (1024 samples)</li>
+              <li>Per-window inference followed by majority vote within each model</li>
+            </ul>
+          </div>
+          <div class="about-section">
+            <h3>Dataset</h3>
+            <p>The benchmark dataset contains EEG recordings from 121 children (61 with ADHD, 60 controls) aged 7–12. Recordings were made using the 10-20 system with 19 channels at 128 Hz, during a visual attention task. ADHD diagnosis was confirmed by an experienced psychiatrist using DSM-IV criteria.</p>
+          </div>
+          <div class="about-section">
+            <h3>Ethical Considerations</h3>
+            <p>AI-based medical decision support tools must be used responsibly. This system is intended to support clinical research, not to replace clinical judgment.</p>
+            <ul>
+              <li>Predictions are based on patterns in training data and may reflect biases</li>
+              <li>The model has not been validated across diverse populations or EEG devices</li>
+              <li>False positives may cause unnecessary anxiety; false negatives may delay needed treatment</li>
+              <li>Patient data should be handled according to applicable privacy regulations (GDPR, HIPAA)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-section-title">Supported EEG Configurations</div>
+          <div style="font-size:13px; line-height:1.7; color:var(--text);">
+            <strong>Channels (19):</strong>
+            <div style="font-family:Courier New,monospace; font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4;">FP1, FP2, F3, F4, C3, C4, P3, P4, O1, O2, F7, F8, T7, T8, P7, P8, FZ, CZ, PZ</div>
+            <br>
+            <strong>Sampling rate:</strong> Any (auto-resampled to 256 Hz)<br>
+            <strong>File format:</strong> CSV with one column per channel<br>
+            <strong>Reference:</strong> Linked earlobes (A1, A2) recommended
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-section-title">Tech Stack</div>
+          <div style="font-size:13px; line-height:1.9; color:var(--text);">
+            <div><strong>Backend:</strong> FastAPI + PyTorch</div>
+            <div><strong>Models:</strong> EEGPT, NeuroGPT, EEGNet (braindecode)</div>
+            <div><strong>Preprocessing:</strong> MNE-Python</div>
+            <div><strong>Training:</strong> Azure GPU cluster</div>
+            <div><strong>Frontend:</strong> Vanilla HTML/JS + Chart.js</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-section-title">Resources</div>
+          <div style="font-size:13px; line-height:1.9;">
+            <div>📦 <a href="https://github.com/jovanaristevska/EEG-models" target="_blank" style="color:var(--primary);">GitHub Repository</a></div>
+            <div>📚 <a href="#" style="color:var(--primary);">API Documentation</a></div>
+            <div>📄 <a href="#" style="color:var(--primary);">Technical Report</a></div>
+          </div>
+        </div>
+        <div class="info-box" style="margin-top:20px;">
+          <strong>Citation</strong><br>
+          Ristevska, J. (2026). EEG-FM-Bench: Benchmarking Foundation Models for ADHD Classification from EEG. <em>Diploma thesis, FINKI Skopje.</em>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const API_BASE = 'http://localhost:8000';
+const STORAGE_KEY = 'eeg_analysis_history';
+
+const MODEL_LABELS = { eegpt: 'EEGPT', eegnet: 'EEGNet', neurogpt: 'NeuroGPT' };
+
+const MODEL_META = {
+  neurogpt: {
+    name: 'NeuroGPT', architecture: 'Transformer (pretrained)',
+    status: 'production', statusLabel: 'Production', badgeClass: 'badge-success',
+    auroc: 0.995, accuracy: 0.945, balancedAcc: 0.949, aucPr: 0.994, bestEpoch: 7,
+    params: '~85M', channels: 19, pretrained: true,
+    chunkLen: 500, numChunks: 2, checkpoint: 'neurogpt_adhd_epoch_7.pt',
+    description: 'Pretrained transformer foundation model fine-tuned on ADHD classification.',
+  },
+  eegpt: {
+    name: 'EEGPT', architecture: 'EEG Transformer',
+    status: 'beta', statusLabel: 'Beta', badgeClass: 'badge-info',
+    auroc: 0.896, accuracy: 0.788, balancedAcc: 0.808, aucPr: 0.866, bestEpoch: 6,
+    params: '~25M', channels: 19, pretrained: false,
+    patchSize: 64, embedDim: 512, depth: 8, checkpoint: 'eegpt_unified_epoch_6.pt',
+    description: 'Transformer trained from scratch with channel-as-token architecture.',
+  },
+  eegnet: {
+    name: 'EEGNet', architecture: 'Compact CNN',
+    status: 'baseline', statusLabel: 'Baseline', badgeClass: 'badge-muted',
+    auroc: 0.893, accuracy: 0.671, balancedAcc: 0.705, aucPr: 0.811, bestEpoch: 10,
+    params: '~3K', channels: 19, pretrained: false,
+    F1: 8, D: 2, kernelLength: 64, checkpoint: 'eegnet_adhd_epoch_10.pt',
+    description: 'Lightweight CNN baseline with depthwise separable convolutions.',
+  },
+};
+
+const BAND_META = {
+  delta: { icon: '🌊', range: '0.5 - 4 Hz',  desc: 'Deep sleep' },
+  theta: { icon: '〰️', range: '4 - 8 Hz',    desc: 'Attention, memory' },
+  alpha: { icon: '➰', range: '8 - 12 Hz',   desc: 'Relaxation' },
+  beta:  { icon: '📶', range: '12 - 30 Hz',  desc: 'Active thinking' },
+  gamma: { icon: '⚡', range: '30 - 45 Hz',  desc: 'Cognitive processing' },
+};
+
+let selectedFile = null, eegChart = null, currentEegSignal = null;
+let lastResult = null, progressInterval = null;
+let history = loadHistory(), explainSelectedModel = 'neurogpt';
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => navigateTo(item.dataset.page));
+});
+
+function navigateTo(pageName) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelector(`.nav-item[data-page="${pageName}"]`)?.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${pageName}`)?.classList.add('active');
+  if (pageName === 'models') renderModelsPage();
+  if (pageName === 'history') renderHistoryPage();
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/health`);
+    const d = await r.json();
+    const dot = document.getElementById('health-dot');
+    const lbl = document.getElementById('health-label');
+    if (d.status === 'ok') {
+      dot.classList.add('ok');
+      lbl.textContent = d.mock_mode ? 'Mock mode' : 'Online';
+    } else { dot.classList.add('err'); lbl.textContent = 'API error'; }
+  } catch {
+    document.getElementById('health-dot').classList.add('err');
+    document.getElementById('health-label').textContent = 'Offline';
+  }
+}
+
+function onFileSelect(e) { if (e.target.files[0]) setFile(e.target.files[0]); }
+function onDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('dragover'); }
+function onDragLeave() { document.getElementById('upload-zone').classList.remove('dragover'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('dragover');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+}
+function setFile(file) {
+  selectedFile = file;
+  document.getElementById('upload-zone').classList.add('file-selected');
+  const nameEl = document.getElementById('file-name');
+  nameEl.style.display = 'block';
+  nameEl.textContent = '✅ ' + file.name;
+  document.getElementById('analyze-btn').disabled = false;
+}
+
+async function analyzeEEG() {
+  if (!selectedFile) { showError('analyze', 'Please upload a CSV file first.'); return; }
+  showProgress();
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  try {
+    const r = await fetch(`${API_BASE}/predict_all`, { method: 'POST', body: formData });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail || 'Analysis failed'); }
+    const data = await r.json();
+    hideProgress();
+    showResults(data);
+  } catch (e) {
+    hideProgress();
+    showError('analyze', e.message);
+  }
+}
+
+function showProgress() {
+  document.getElementById('upload-state').style.display = 'none';
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('progress-card').scrollIntoView({behavior:'smooth'});
+  const steps = [
+    { pct: 12, msg: 'Step 1/5: Reading and validating CSV...' },
+    { pct: 28, msg: 'Step 2/5: Applying filters (notch + bandpass)...' },
+    { pct: 44, msg: 'Step 3/5: Resampling and creating windows...' },
+    { pct: 60, msg: 'Step 4/5: Running NeuroGPT inference...' },
+    { pct: 75, msg: 'Step 4/5: Running EEGPT inference...' },
+    { pct: 88, msg: 'Step 4/5: Running EEGNet inference...' },
+    { pct: 96, msg: 'Step 5/5: Computing ensemble decision...' },
+  ];
+  let i = 0;
+  progressInterval = setInterval(() => {
+    if (i < steps.length) {
+      document.getElementById('progressBar').style.width = steps[i].pct + '%';
+      document.getElementById('progressPercent').textContent = steps[i].pct + '%';
+      document.getElementById('progressStep').textContent = steps[i].msg;
+      i++;
+    }
+  }, 1500);
+}
+function hideProgress() {
+  clearInterval(progressInterval);
+  document.getElementById('progressBar').style.width = '100%';
+  document.getElementById('progressPercent').textContent = '100%';
+  setTimeout(() => { document.getElementById('progress-card').style.display = 'none'; }, 400);
+}
+
+function showResults(data) {
+  document.getElementById('upload-state').style.display = 'none';
+  document.getElementById('results-state').style.display = 'block';
+  document.getElementById('results-state').scrollIntoView({behavior:'smooth', block:'start'});
+
+  lastResult = {
+    ...data,
+    patient_id: document.getElementById('patient-id').value || null,
+    session_date: document.getElementById('session-date').value || null,
+    timestamp: new Date().toISOString(),
+    file_name: selectedFile?.name || null,
+  };
+
+  const ensemble = data.ensemble;
+  const isADHD = ensemble.prediction === 'ADHD';
+
+  document.getElementById('status-bar').className = 'status-bar ' + (isADHD ? 'adhd' : 'control');
+  const icon = document.getElementById('result-icon');
+  icon.className = 'result-icon ' + (isADHD ? 'adhd' : 'control');
+  icon.textContent = isADHD ? '⚠' : '✓';
+  document.getElementById('result-title').textContent = isADHD ? 'ADHD patterns detected' : 'No ADHD patterns detected';
+
+  document.getElementById('sum-patient').textContent = lastResult.patient_id || 'Not provided';
+  document.getElementById('sum-date').textContent = lastResult.session_date || new Date().toLocaleDateString();
+  document.getElementById('sum-windows').textContent = data.windows_analyzed || 0;
+  const durSec = ((data.windows_analyzed || 0) * 4).toFixed(0);
+  document.getElementById('sum-duration').textContent = `${durSec} seconds`;
+
+  document.getElementById('conf-value').textContent = ensemble.confidence.toFixed(1) + '%';
+  document.getElementById('agreement-text').textContent = `${ensemble.agreement} models agree`;
+
+  const relBadge = document.getElementById('reliability-badge');
+  relBadge.textContent = ensemble.reliability + ' reliability';
+  relBadge.className = 'badge ' + (
+    ensemble.reliability === 'High' ? 'badge-success' :
+    ensemble.reliability === 'Medium' ? 'badge-warning' : 'badge-danger'
+  );
+
+  const winProb = ensemble.confidence;
+  const loseProb = 100 - winProb;
+  const adhdProb = isADHD ? winProb : loseProb;
+  const controlProb = isADHD ? loseProb : winProb;
+  document.getElementById('prob-adhd').style.width = adhdProb + '%';
+  document.getElementById('prob-control').style.width = controlProb + '%';
+  document.getElementById('prob-adhd-pct').textContent = adhdProb.toFixed(1) + '%';
+  document.getElementById('prob-control-pct').textContent = controlProb.toFixed(1) + '%';
+
+  renderPerModel(data.models);
+  currentEegSignal = data.eeg_signal;
+  updateChart(data.eeg_signal);
+  renderBands(data.band_powers);
+  renderExplainTabs(data.models);
+  renderWindowTimeline(data.models[explainSelectedModel]?.window_predictions || []);
+}
+
+function renderPerModel(models) {
+  const container = document.getElementById('per-model-grid');
+  container.innerHTML = '';
+  const order = ['neurogpt', 'eegpt', 'eegnet'];
+  for (const key of order) {
+    const m = models[key];
+    if (!m) continue;
+    const meta = MODEL_META[key];
+    const isADHD = m.prediction === 'ADHD';
+    const tileClass = isADHD ? 'winner-adhd' : 'winner-control';
+    const pillClass = isADHD ? 'adhd' : 'control';
+    const fillColor = isADHD ? 'var(--warning)' : 'var(--success)';
+    const errorMsg = m.error ? `<div style="color:var(--danger); font-size:11.5px; margin-top:8px;">⚠ ${m.error}</div>` : '';
+    container.insertAdjacentHTML('beforeend', `
+      <div class="model-tile ${tileClass}">
+        <div class="model-tile-header">
+          <div>
+            <div class="model-tile-name">${meta.name}</div>
+            <div class="model-tile-arch">${meta.architecture}</div>
+          </div>
+          ${m.mock_mode ? '<span class="badge badge-warning" style="font-size:10px;">mock</span>' : ''}
+        </div>
+        <div class="model-tile-prediction">
+          <span class="prediction-pill ${pillClass}">${m.prediction || 'Error'}</span>
+        </div>
+        <div class="model-tile-metric-row">
+          <span class="lbl">Confidence</span>
+          <span class="val">${m.confidence ? m.confidence.toFixed(1) + '%' : '—'}</span>
+        </div>
+        <div class="model-confidence-bar">
+          <div class="bg"><div class="fill" style="width:${m.confidence || 0}%; background:${fillColor};"></div></div>
+        </div>
+        <div class="model-tile-metric-row" style="margin-top:8px;">
+          <span class="lbl">Reliability</span>
+          <span class="val">${m.reliability}</span>
+        </div>
+        <div class="model-tile-metric-row">
+          <span class="lbl">Test AUROC</span>
+          <span class="val">${meta.auroc.toFixed(3)}</span>
+        </div>
+        <div class="model-tile-meta">${meta.params} params · ${meta.channels} channels · ${meta.pretrained ? 'pretrained' : 'from scratch'}</div>
+        ${errorMsg}
+      </div>
+    `);
+  }
+}
+
+function renderExplainTabs(models) {
+  const container = document.getElementById('explain-model-selector');
+  container.innerHTML = '';
+  const order = ['neurogpt', 'eegpt', 'eegnet'];
+  if (!models[explainSelectedModel]) explainSelectedModel = 'neurogpt';
+  for (const key of order) {
+    if (!models[key]) continue;
+    const meta = MODEL_META[key];
+    const btn = document.createElement('button');
+    btn.className = 'explain-tab' + (key === explainSelectedModel ? ' active' : '');
+    btn.textContent = meta.name;
+    btn.onclick = () => {
+      explainSelectedModel = key;
+      renderExplainTabs(models);
+      renderWindowTimeline(models[key]?.window_predictions || []);
+    };
+    container.appendChild(btn);
+  }
+}
+
+function newAnalysis() {
+  selectedFile = null;
+  lastResult = null;
+  document.getElementById('upload-zone').classList.remove('file-selected');
+  document.getElementById('file-name').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('patient-id').value = '';
+  document.getElementById('session-date').value = '';
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('results-state').style.display = 'none';
+  document.getElementById('upload-state').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+const CHART_COLORS = { FP1: '#3b82f6', FP2: '#10b981', O1: '#f59e0b', T7: '#ef4444' };
+
+function initChart() {
+  const ctx = document.getElementById('eeg-chart').getContext('2d');
+  eegChart = new Chart(ctx, {
+    type: 'line', data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } } },
+      scales: {
+        x: { title: { display: true, text: 'Time (s)', font: { size: 11 } }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+        y: { title: { display: true, text: 'Amplitude (µV)', font: { size: 11 } }, ticks: { font: { size: 10 } } },
+      },
+      elements: { line: { tension: 0.3, borderWidth: 1.5 }, point: { radius: 0 } },
+    },
+  });
+}
+function updateChart(signal) {
+  if (!eegChart || !signal) return;
+  const windowSec = parseInt(document.getElementById('time-window').value, 10);
+  const maxSamples = windowSec * 256;
+  const time = signal.time.slice(0, maxSamples);
+  const labels = time.map(t => t.toFixed(2));
+  const datasets = Object.entries(CHART_COLORS).map(([ch, color]) => ({
+    label: ch, data: (signal[ch] || []).slice(0, maxSamples),
+    borderColor: color, backgroundColor: 'transparent',
+    tension: 0.3, borderWidth: 1.5, pointRadius: 0,
+  }));
+  eegChart.data.labels = labels;
+  eegChart.data.datasets = datasets;
+  eegChart.update('none');
+}
+function updateChartWindow() { if (currentEegSignal) updateChart(currentEegSignal); }
+
+function renderBands(bandPowers) {
+  const container = document.getElementById('bands-container');
+  container.innerHTML = '';
+  for (const [band, meta] of Object.entries(BAND_META)) {
+    const bp = bandPowers[band] || { power: 0, status: 'Normal' };
+    const badgeClass = {
+      'Normal': 'badge-success', 'High': 'badge-danger',
+      'Slightly High': 'badge-warning', 'Low': 'badge-info',
+    }[bp.status] || 'badge-muted';
+    container.insertAdjacentHTML('beforeend', `
+      <div class="band-row">
+        <div class="band-icon">${meta.icon}</div>
+        <div class="band-info">
+          <div class="band-name">${band.charAt(0).toUpperCase() + band.slice(1)}</div>
+          <div class="band-freq">${meta.range} · ${meta.desc}</div>
+        </div>
+        <span class="badge ${badgeClass}">${bp.status}</span>
+      </div>
+    `);
+  }
+}
+
+function renderWindowTimeline(windows) {
+  const container = document.getElementById('window-timeline');
+  container.innerHTML = '';
+  if (!windows || !windows.length) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">No per-window data available.</div>';
+    return;
+  }
+  windows.forEach((w, i) => {
+    const isADHD = w.prediction === 'ADHD';
+    const block = document.createElement('div');
+    block.className = 'window-block ' + (isADHD ? 'adhd' : 'control');
+    block.title = `Window ${i+1}: ${w.prediction} (${(w.confidence * 100).toFixed(1)}%)`;
+    block.style.opacity = 0.4 + (w.confidence || 0.5) * 0.6;
+    container.appendChild(block);
+  });
+}
+
+function renderModelsPage() {
+  const grid = document.getElementById('models-grid');
+  grid.innerHTML = '';
+  const sortedKeys = Object.keys(MODEL_META).sort((a,b) => {
+    if (MODEL_META[a].status === 'production') return -1;
+    if (MODEL_META[b].status === 'production') return 1;
+    return MODEL_META[b].auroc - MODEL_META[a].auroc;
+  });
+  for (const key of sortedKeys) {
+    const m = MODEL_META[key];
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="model-card">
+        <div class="model-card-header">
+          <div><div class="model-name">${m.name}</div><div class="model-arch">${m.architecture}</div></div>
+          <span class="badge ${m.badgeClass}">${m.statusLabel}</span>
+        </div>
+        <div class="model-hero-metric">
+          <div class="hero-value tabular">${m.auroc.toFixed(3)}</div>
+          <div class="hero-label">Test AUROC</div>
+        </div>
+        <div class="mini-metrics">
+          <div class="mini-metric"><div class="mini-value tabular">${(m.accuracy*100).toFixed(1)}%</div><div class="mini-label">Accuracy</div></div>
+          <div class="mini-metric"><div class="mini-value tabular">${(m.balancedAcc*100).toFixed(1)}%</div><div class="mini-label">Bal Acc</div></div>
+          <div class="mini-metric"><div class="mini-value tabular">${m.aucPr.toFixed(3)}</div><div class="mini-label">AUC-PR</div></div>
+        </div>
+        <p style="font-size:12.5px; color:var(--text-muted); line-height:1.6; margin-bottom:14px;">${m.description}</p>
+        <div class="tag-list">
+          <span class="tag">${m.channels} channels</span>
+          <span class="tag">${m.params} params</span>
+          <span class="tag">epoch ${m.bestEpoch}</span>
+          ${m.pretrained ? '<span class="tag highlight">pretrained</span>' : ''}
+        </div>
+        <div class="model-card-footer">
+          <span class="checkpoint-name">${m.checkpoint}</span>
+        </div>
+      </div>
+    `);
+  }
+  const tbody = document.getElementById('compare-tbody');
+  tbody.innerHTML = '';
+  const sortedByAuroc = Object.entries(MODEL_META).sort((a,b) => b[1].auroc - a[1].auroc);
+  sortedByAuroc.forEach(([key, m], i) => {
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr class="${i === 0 ? 'winner' : ''}">
+        <td><strong>${m.name}</strong></td>
+        <td class="num">${m.auroc.toFixed(3)}</td>
+        <td class="num">${(m.accuracy*100).toFixed(1)}%</td>
+        <td class="num">${(m.balancedAcc*100).toFixed(1)}%</td>
+        <td class="num">${m.aucPr.toFixed(3)}</td>
+        <td class="num">${m.bestEpoch}</td>
+      </tr>
+    `);
+  });
+  const archGrid = document.getElementById('arch-details-grid');
+  archGrid.innerHTML = '';
+  for (const [key, m] of Object.entries(MODEL_META)) {
+    let extra = '';
+    if (key === 'neurogpt') extra = `<dt>Chunk length</dt><dd>${m.chunkLen}</dd><dt>Num chunks</dt><dd>${m.numChunks}</dd>`;
+    else if (key === 'eegpt') extra = `<dt>Patch size</dt><dd>${m.patchSize}</dd><dt>Embed dim</dt><dd>${m.embedDim}</dd><dt>Depth</dt><dd>${m.depth}</dd>`;
+    else if (key === 'eegnet') extra = `<dt>F1 filters</dt><dd>${m.F1}</dd><dt>D (depth mult.)</dt><dd>${m.D}</dd><dt>Kernel length</dt><dd>${m.kernelLength}</dd>`;
+    archGrid.insertAdjacentHTML('beforeend', `
+      <div style="border:1px solid var(--border); border-radius:10px; padding:18px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:12px;">${m.name}</div>
+        <dl class="arch-detail">
+          <dt>Parameters</dt><dd>${m.params}</dd>
+          <dt>Input channels</dt><dd>${m.channels}</dd>
+          <dt>Pretrained</dt><dd>${m.pretrained ? 'Yes' : 'No'}</dd>
+          ${extra}
+        </dl>
+      </div>
+    `);
+  }
+}
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveHistoryArr(arr) {
+  history = arr;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  updateHistoryCount();
+}
+function updateHistoryCount() { document.getElementById('history-count').textContent = history.length; }
+
+function saveToHistory() {
+  if (!lastResult) return;
+  const entry = {
+    id: 'A' + Date.now().toString(36),
+    timestamp: lastResult.timestamp,
+    patient_id: lastResult.patient_id || '—',
+    session_date: lastResult.session_date,
+    ensemble_prediction: lastResult.ensemble.prediction,
+    ensemble_confidence: lastResult.ensemble.confidence,
+    ensemble_reliability: lastResult.ensemble.reliability,
+    ensemble_agreement: lastResult.ensemble.agreement,
+    windows: lastResult.windows_analyzed,
+    file_name: lastResult.file_name,
+    per_model: Object.fromEntries(
+      Object.entries(lastResult.models).map(([k, v]) => [k, {
+        prediction: v.prediction, confidence: v.confidence, reliability: v.reliability,
+      }])
+    ),
+  };
+  saveHistoryArr([entry, ...history]);
+  toast('Saved to history');
+}
+
+function clearAllHistory() {
+  if (history.length === 0) return;
+  if (!confirm(`Delete all ${history.length} entries? This cannot be undone.`)) return;
+  saveHistoryArr([]);
+  renderHistory();
+  toast('History cleared');
+}
+function deleteHistoryEntry(id) {
+  saveHistoryArr(history.filter(h => h.id !== id));
+  renderHistory();
+  toast('Entry deleted');
+}
+
+function renderHistoryPage() { renderHistoryStats(); renderHistory(); }
+
+function renderHistoryStats() {
+  const total = history.length;
+  const adhd = history.filter(h => h.ensemble_prediction === 'ADHD').length;
+  const control = history.filter(h => h.ensemble_prediction === 'Control').length;
+  const avgConf = total > 0 ? (history.reduce((s, h) => s + h.ensemble_confidence, 0) / total).toFixed(1) : '—';
+  document.getElementById('history-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-value tabular">${total}</div><div class="stat-label">Total analyses</div></div>
+    <div class="stat-card"><div class="stat-value tabular" style="color:var(--warning);">${adhd}</div><div class="stat-label">ADHD detected</div></div>
+    <div class="stat-card"><div class="stat-value tabular" style="color:var(--success);">${control}</div><div class="stat-label">Control</div></div>
+    <div class="stat-card"><div class="stat-value tabular">${avgConf}${avgConf !== '—' ? '%' : ''}</div><div class="stat-label">Avg confidence</div></div>
+  `;
+}
+
+function renderHistory() {
+  const tbody = document.getElementById('history-tbody');
+  const emptyEl = document.getElementById('history-empty');
+  tbody.innerHTML = '';
+  const search = document.getElementById('history-search').value.toLowerCase();
+  const filterPred = document.getElementById('filter-prediction').value;
+  const filtered = history.filter(h => {
+    if (search && !(h.patient_id || '').toLowerCase().includes(search)) return false;
+    if (filterPred && h.ensemble_prediction !== filterPred) return false;
+    return true;
+  });
+  if (filtered.length === 0) { emptyEl.style.display = 'block'; return; }
+  emptyEl.style.display = 'none';
+  filtered.forEach(h => {
+    const isADHD = h.ensemble_prediction === 'ADHD';
+    const dateStr = new Date(h.timestamp).toLocaleString('en-GB', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td class="tabular">${dateStr}</td>
+        <td>${h.patient_id}</td>
+        <td><span class="badge ${isADHD ? 'badge-warning' : 'badge-success'}">${h.ensemble_prediction}</span></td>
+        <td class="tabular">${h.ensemble_confidence.toFixed(1)}%</td>
+        <td class="tabular">${h.ensemble_agreement || '—'}</td>
+        <td class="tabular">${h.windows}</td>
+        <td class="actions">
+          <button class="icon-btn danger" onclick="deleteHistoryEntry('${h.id}')" title="Delete">🗑</button>
+        </td>
+      </tr>
+    `);
+  });
+}
+
+function exportHistoryCSV() {
+  if (history.length === 0) { toast('No history to export'); return; }
+  const headers = ['Timestamp', 'Patient ID', 'Session Date', 'Ensemble Prediction',
+                   'Ensemble Confidence', 'Reliability', 'Agreement', 'Windows', 'File',
+                   'NeuroGPT', 'NeuroGPT Conf', 'EEGPT', 'EEGPT Conf', 'EEGNet', 'EEGNet Conf'];
+  const rows = history.map(h => [
+    h.timestamp, h.patient_id, h.session_date || '',
+    h.ensemble_prediction, h.ensemble_confidence.toFixed(1) + '%',
+    h.ensemble_reliability, h.ensemble_agreement || '', h.windows, h.file_name || '',
+    h.per_model?.neurogpt?.prediction || '', (h.per_model?.neurogpt?.confidence || 0).toFixed(1) + '%',
+    h.per_model?.eegpt?.prediction || '',    (h.per_model?.eegpt?.confidence || 0).toFixed(1) + '%',
+    h.per_model?.eegnet?.prediction || '',   (h.per_model?.eegnet?.confidence || 0).toFixed(1) + '%',
+  ]);
+  const csv = [headers, ...rows]
+    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  downloadFile('eeg_history_' + new Date().toISOString().slice(0,10) + '.csv', csv, 'text/csv');
+  toast('Exported ' + history.length + ' entries');
+}
+
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportResultPDF() {
+  toast('Opening print dialog (save as PDF)');
+  setTimeout(() => window.print(), 200);
+}
+
+function showError(page, msg) {
+  document.getElementById('error-msg-' + page).textContent = msg;
+  document.getElementById('error-card-' + page).style.display = 'flex';
+}
+function dismissError(page) { document.getElementById('error-card-' + page).style.display = 'none'; }
+function toast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  checkHealth();
+  initChart();
+  updateHistoryCount();
+});
+</script>
+</body>
+</html>

@@ -1,15 +1,15 @@
-# BIOT Separated Full Training Configuration
-# This configuration demonstrates separate model training for individual datasets with full fine-tuning
+# EEGNet Crown 8-channel Training Configuration
+# Mirror of eegnet_adhd.yaml but for the 8-channel Neurosity Crown dataset.
 
 # Basic configuration
 seed: 42
-master_port: 51100
-multitask: false  # Train separate models for each dataset
+master_port: 51200            # different port from 19-ch version (51100)
+multitask: false              # Train separate model for this dataset
 
 # Data configuration
 data:
   datasets:
-    adhd: 'finetune'
+    adhd_crown: 'finetune'    # CHANGED: was 'adhd'
   batch_size: 1024
   num_workers: 1
 
@@ -20,17 +20,17 @@ model:
   # Classifier head configuration
   classifier_head:
     head_type: 'avg_pool'  # Options: avg_pool, attention_pool, dual_stream_fusion, flatten_mlp
-    
+
     # Common parameters
     hidden_dims: [128]
     dropout: 0.3
-    
+
     # Attention Pool parameters (for attention_pool)
     attn_n_head: 4
     attn_head_dim: 64
-    
+
     # Dual Stream Fusion parameters (for dual_stream_fusion)
-    fusion_mode: 'dual'  # Options: time_first, channel_first, dual
+    fusion_mode: 'dual'    # Options: time_first, channel_first, dual
     fusion_n_head: 4
     fusion_head_dim: 64
     fusion_use_rope: true
@@ -48,12 +48,12 @@ training:
   encoder_lr_scale: 1.0
   warmup_epochs: 5
   warmup_scale: 1e-1
-  pct_start: 0.1          # For OneCycleLR
+  pct_start: 0.1            # For OneCycleLR
   min_lr: 5e-4
 
   # Training options
   use_amp: false
-  freeze_encoder: false  # Allow full fine-tuning for single dataset
+  freeze_encoder: false     # Allow full fine-tuning for single dataset
 
   # LoRA configuration
   lora:
@@ -63,23 +63,23 @@ training:
     lora_dropout: 0.0
     lora_target_modules: ['default']
     lora_exclude_modules: null
-    lora_target_type: 'default'  # Options: default, full, attention, ffn
-    lora_scope: 'transformer'    # Options: transformer, full
+    lora_target_type: 'default'   # Options: default, full, attention, ffn
+    lora_scope: 'transformer'     # Options: transformer, full
     lora_lr_scale: 1.0
 
 # Logging configuration
 logging:
-  experiment_name: "eegnet"
+  experiment_name: "eegnet_crown"          # CHANGED: distinct run name
   run_dir: "assets/run"
 
   # Cloud logging
   use_cloud: true
   cloud_backend: "wandb"
 
-  project: "eegnet"
+  project: "eegnet_crown"                  # CHANGED: distinct project
   offline: false
 
-  tags: ["eegnet", "full"]
+  tags: ["eegnet", "crown", "adhd", "8ch", "full"]  # CHANGED: added 'crown', '8ch'
 
   # Logging intervals
   log_step_interval: 2

@@ -9,6 +9,7 @@ from datasets import Dataset, concatenate_datasets, Value
 
 from data.dataset.adftd import AdftdBuilder
 from data.dataset.adhd import ADHDBuilder
+from data.dataset.adhd_crown import ADHDCrownBuilder
 from data.dataset.bcic.bcic_1a import BCIC1ABuilder
 from data.dataset.bcic.bcic_2020_3 import BCIC2020ImagineBuilder
 from data.dataset.bcic.bcic_2a import BCIC2ABuilder
@@ -88,6 +89,7 @@ DATASET_SELECTOR: dict[str, Type[EEGDatasetBuilder]] = {
     'chisco': ChiscoBuilder,
     'open_miir': OpenMiirBuilder,
     'adhd': ADHDBuilder,
+    'adhd_crown': ADHDCrownBuilder,
 }
 
 def get_dataset_patch_len(dataset_name: str, config_name: str) -> int:

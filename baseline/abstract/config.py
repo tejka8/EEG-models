@@ -76,6 +76,7 @@ class BaseTrainingArgs(BaseModel):
     max_epochs: int = 100
     weight_decay: float = 0.01
     max_grad_norm: float = 1.0
+    early_stopping_patience: int = 10
 
     lr_schedule: str = "onecycle"  # 'onecycle' or 'cosine'
     max_lr: float = 1e-4

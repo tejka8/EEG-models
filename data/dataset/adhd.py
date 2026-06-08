@@ -14,7 +14,6 @@
 #   - Sampling rate: 128 Hz
 #   - 121 subjects total: 61 ADHD, 60 Control
 #
-# Place this file in: data/dataset/adhd.py
 # ============================================================
 
 import logging
@@ -67,7 +66,7 @@ class ADHDConfig(EEGConfig):
 
     # Notch filter at 50 Hz to remove European power-line electrical noise
     filter_notch: float = 50.0
-    is_notched: bool = True
+    is_notched: bool = False
 
     # Key used in wrapper.py's DATASET_SELECTOR to find this builder by name
     dataset_name: Optional[str] = 'adhd'
@@ -159,21 +158,17 @@ class ADHDBuilder(EEGDatasetBuilder):
     #    v107     | Control
     #    v5p      | ADHD
     #    ...
-    #    The label comes ONLY from the 'Class' column, NOT the filename.
-    #    'v107' is Control because its Class column says 'Control'.
-    #    There is no naming pattern — we never guess from the filename.
     # ------------------------------------------------------------------
     def _load_meta_info(self):
 
-        # Path to the original downloaded file, e.g. /data/eeg/ADHD/adhd.csv
+        # Path to the original downloaded file
         original_csv = os.path.join(self.config.raw_path, 'adhdata.csv')
 
-        # Where the per-subject files will live, e.g. /data/eeg/ADHD/subjects/
+        # Where the per-subject files will live
         subjects_dir = os.path.join(self.config.raw_path, self.config.scan_sub_dir)
         os.makedirs(subjects_dir, exist_ok=True)  # create the folder if it doesn't exist
 
         # Read the entire original CSV into memory
-        # This is a ~165MB file with all 121 subjects stacked together
         try:
             logger.info(f"Reading original CSV: {original_csv}")
             df_all = pd.read_csv(original_csv)
@@ -253,8 +248,8 @@ class ADHDBuilder(EEGDatasetBuilder):
     # and the .csv extension, leaving just the filename stem.
     #
     # Examples:
-    #   '/data/ADHD/subjects/v10p.csv' → subject_id = 'v10p'
-    #   '/data/ADHD/subjects/v107.csv' → subject_id = 'v107'
+    #   '\assets\data\raw\ADHD\subjects\v10p.csv' → subject_id = 'v10p'
+    #   '\assets\data\raw\ADHD\subjects\v107.csv' → subject_id = 'v107'
     #
     # We do NOT try to parse the label from this string.
     # The label is looked up from self.sub_meta in _resolve_exp_meta_info.

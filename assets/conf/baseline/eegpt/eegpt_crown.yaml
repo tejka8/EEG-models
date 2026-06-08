@@ -1,9 +1,9 @@
-# EEGPT Separate Models Training Configuration
-# This config demonstrates training separate models for each dataset
+# EEGPT Crown 8-channel Training Configuration
+# Mirror of eegpt_adhd.yaml but for the 8-channel Neurosity Crown dataset.
 
 # Training pattern flags
 seed: 42
-master_port: 51103
+master_port: 51203          # different port from 19-ch version (51103)
 multitask: true
 model_type: 'eegpt'
 
@@ -12,9 +12,7 @@ data:
   batch_size: 32
   num_workers: 1
   datasets:
-    adhd: 'finetune',
-    # ...
-
+    adhd_crown: 'finetune'  # CHANGED: was 'adhd'
 
 # EEGPT-specific model configuration
 model:
@@ -24,23 +22,23 @@ model:
   # Classifier head configuration
   classifier_head:
     head_type: 'avg_pool'  # Options: avg_pool, attention_pool, dual_stream_fusion, flatten_mlp
-    
+
     # Common parameters
     hidden_dims: [128]
     dropout: 0.3
-    
+
     # Attention Pool parameters (for attention_pool)
     attn_n_head: 4
     attn_head_dim: 64
-    
+
     # Dual Stream Fusion parameters (for dual_stream_fusion)
-    fusion_mode: 'dual'  # Options: time_first, channel_first, dual
+    fusion_mode: 'dual'    # Options: time_first, channel_first, dual
     fusion_n_head: 4
     fusion_head_dim: 64
     fusion_use_rope: true
     fusion_rope_theta: 10000.0
     fusion_max_seq_len: 1024
-    
+
     # Flatten MLP parameters (for flatten_mlp)
 
   # EEGPT architecture parameters
@@ -75,21 +73,21 @@ training:
   max_epochs: 50
   weight_decay: 0.01
   max_grad_norm: 3.0
-    
+
   # Optimizer settings
   lr_schedule: "onecycle"  # 'onecycle' or 'cosine'
   max_lr: 5e-4
   encoder_lr_scale: 0.1    # Scale factor for encoder learning rate
   warmup_epochs: 5
   warmup_scale: 1e-2
-  pct_start: 0.2          # For OneCycleLR
-  min_lr: 1e-6            # For CosineAnnealingLR
+  pct_start: 0.2           # For OneCycleLR
+  min_lr: 1e-6             # For CosineAnnealingLR
 
   # Training options
-  freeze_encoder: false     # Whether to freeze encoder weights
-  use_amp: true           # Use automatic mixed precision
+  freeze_encoder: false    # Whether to freeze encoder weights
+  use_amp: true            # Use automatic mixed precision
 
-  label_smoothing: 0.1    # Label smoothing factor
+  label_smoothing: 0.1     # Label smoothing factor
 
   # LoRA configuration
   lora:
@@ -105,22 +103,21 @@ training:
 
 # Logging configuration
 logging:
-  experiment_name: "eegpt"
+  experiment_name: "eegpt_crown"   # CHANGED: distinct run name
   run_dir: "assets/run"
-  
+
   # Cloud logging configuration
   use_cloud: true
-  cloud_backend: "wandb"  # Options: 'wandb', 'comet', or 'both'
-  
+  cloud_backend: "wandb"           # Options: 'wandb', 'comet', or 'both'
+
   # Unified cloud logging parameters (works for both wandb and comet)
-  project: 'eegpt'           # Project name (uses experiment_name if not specified)
-  entity: null            # Wandb entity / Comet workspace
-  api_key: null           # API key (or set via WANDB_API_KEY/COMET_API_KEY environment variables)
+  project: 'eegpt_crown'           # CHANGED: distinct project
+  entity: null                     # Wandb entity / Comet workspace
+  api_key: null                    # API key (or set via env vars)
   offline: false
-  
-  tags: ['eegpt', 'unified', 'full', "debug"]
+
+  tags: ['eegpt', 'crown', 'adhd', '8ch']   # CHANGED: added 'crown', '8ch'
 
   # Logging intervals
   log_step_interval: 1      # Log every N steps
-  ckpt_interval: 1       # Evaluate every N epochs
-
+  ckpt_interval: 1          # Evaluate every N epochs
