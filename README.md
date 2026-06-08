@@ -2,8 +2,6 @@
 
 > A reproducible benchmarking framework for comparing modern deep learning architectures on EEG-based ADHD classification, with support for both clinical 19-channel EEG (10-20 system) and the consumer Neurosity Crown 8-channel headset.
 
-Diploma thesis project — Faculty of Computer Science and Engineering (FINKI), Ss. Cyril and Methodius University in Skopje.
-
 ---
 
 ## Overview
@@ -12,9 +10,9 @@ EEG-FM-Bench evaluates three deep learning architectures on the task of ADHD cla
 
 | Model | Type | Pretrained |
 |-------|------|------------|
-| **NeuroGPT** | EEG Conformer + GPT transformer foundation model | ✅ Yes |
-| **EEGPT** | Channel-as-token transformer | ❌ No (trained from scratch) |
-| **EEGNet** | Compact CNN baseline (braindecode) | ❌ No |
+| **NeuroGPT** | EEG Conformer + GPT transformer foundation model |  Yes |
+| **EEGPT** | Channel-as-token transformer |  No (trained from scratch) |
+| **EEGNet** | Compact CNN baseline (braindecode) |  No |
 
 All models share an identical preprocessing pipeline, train/validation/test split, and evaluation metrics, enabling fair head-to-head comparison. A final ensemble decision is computed via majority vote across the three models.
 
